@@ -1,0 +1,22 @@
+{
+  "name": "discord-store",
+  "version": "0.1.0",
+  "description": "Auto-delivery Discord shop bot with QRIS payment",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy": "node src/deploy-commands.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "mongodb": "^6.10.0",
+    "dotenv": "^16.4.5",
+    "imapflow": "^1.0.164",
+    "mailparser": "^3.7.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

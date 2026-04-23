@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const fs = require\\('fs'\\); const s = fs.readFileSync\\('c:/DiscordStore/src/commands/stock.js', 'utf8'\\); console.log\\('ESC \\(0x1b\\) found:', s.includes\\('\\\\x1b'\\)\\); console.log\\('Total [2; occurrences:', \\(s.match\\(/\\\\[2;/g\\) || []\\).length\\);\")",
+      "Bash(curl -s -L -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36\" \"https://paydisini.co.id\" -o /tmp/paydisini_home.html -w \"HTTP:%{http_code}\\\\n\" --max-time 30)",
+      "Bash(curl -s -L -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36\" \"https://paydisini.co.id/api-docs\" -o /tmp/paydisini_docs.html -w \"HTTP:%{http_code}\\\\n\" --max-time 30)",
+      "Bash(curl -s -L -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36\" \"https://paydisini.co.id/dokumentasi\" -o /tmp/paydisini_dok.html -w \"HTTP:%{http_code}\\\\n\" --max-time 30)",
+      "Read(//tmp/**)",
+      "WebFetch(domain:paydisini.co.id)",
+      "WebSearch",
+      "WebFetch(domain:payment.paydisini.co.id)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl -s \"https://api.github.com/repos/ibnusyawall/paydisini/contents/src\" --max-time 20)",
+      "Bash(curl -s \"https://api.github.com/repos/ibnusyawall/paydisini/contents/src/utils\" --max-time 20)",
+      "Bash(curl -s \"https://api.github.com/repos/ibnusyawall/paydisini/contents/src/helpers\" --max-time 20)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ibnusyawall/paydisini/main/src/utils/paydisini.ts\" --max-time 20)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ibnusyawall/paydisini/main/src/helpers/index.ts\" --max-time 20)",
+      "Bash(curl -s https://api.github.com/repos/HansPiterson/Static-QRIS-To-Dynamic)",
+      "Bash(curl -s \"https://api.github.com/repos/HansPiterson/Static-QRIS-To-Dynamic/issues?state=all\")",
+      "Bash(curl -s \"https://registry.npmjs.org/-/v1/search?text=qris&size=15\")",
+      "Bash(grep -oE '\"name\":\"[^\"]+\"|\"description\":\"[^\"]{0,100}\"')",
+      "Bash(curl -s \"https://api.github.com/repos/HansPiterson/Static-QRIS-To-Dynamic/issues/1\")",
+      "Bash(grep -oE '\"body\":\"[^\"]{0,500}\"')",
+      "Bash(curl -sL -o /tmp/sawargi_docs.html -w \"HTTP:%{http_code} SIZE:%{size_download} SSL:%{ssl_verify_result} IP:%{remote_ip}\\\\n\" --max-time 30 https://gopay.sawargipay.cloud/docs)",
+      "Bash(curl -sL -o /tmp/sawargi_home.html -w \"HTTP:%{http_code} SIZE:%{size_download}\\\\n\" --max-time 30 https://gopay.sawargipay.cloud/)",
+      "Bash(curl -sL -o /tmp/sawargi_parent.html -w \"HTTP:%{http_code} SIZE:%{size_download}\\\\n\" --max-time 30 https://sawargipay.cloud/)",
+      "Bash(curl -sI --max-time 15 https://gopay.sawargipay.cloud/)",
+      "Bash(mkdir -p /c/tmp/sawargi)",
+      "Bash(curl -sL -o /c/tmp/sawargi/docs.html --max-time 30 https://gopay.sawargipay.cloud/docs)",
+      "Bash(curl -sL -o /c/tmp/sawargi/home.html --max-time 30 https://gopay.sawargipay.cloud/)",
+      "Bash(curl -sL -o /c/tmp/sawargi/parent.html --max-time 30 https://sawargipay.cloud/)",
+      "Read(//c/tmp/**)",
+      "Bash(curl -sk -L -A \"Mozilla/5.0\" --max-time 20 -w \"\\\\n---HTTP:%{http_code}---\\\\n\" https://api-gopay.sawargipay.cloud/)",
+      "Bash(curl -sk -L -A \"Mozilla/5.0\" --max-time 20 -w \"\\\\n---HTTP:%{http_code}---\\\\n\" https://api-gopay.sawargipay.cloud/docs)",
+      "Bash(curl -sk -L -A \"Mozilla/5.0\" --max-time 20 -w \"\\\\n---HTTP:%{http_code}---\\\\n\" https://gopay.sawargipay.cloud/api/docs)",
+      "Read(//c/Users/meidy/AppData/Local/Temp/**)"
+    ]
+  }
+}
