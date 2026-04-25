@@ -9,7 +9,7 @@ const { schedulePanelUpdate } = require('../services/panel');
 const { BRAND, ICON, brandEmbed, guildFooter } = require('../utils/embeds');
 
 const log = createLogger('cmd:sendproduct');
-const MAX_QUANTITY = 50;
+const MAX_QUANTITY = 500;
 
 module.exports = {
   data: new SlashCommandBuilder()

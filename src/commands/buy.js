@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags, PermissionFlagsBits } = require('discord.js');
 const { ObjectId } = require('mongodb');
 const { collections } = require('../db');
 const { formatIDR } = require('../utils/format');
@@ -7,6 +7,8 @@ const { createLogger } = require('../utils/logger');
 const { getProductNames, filterMatches } = require('../utils/productCache');
 const { schedulePanelUpdate } = require('../services/panel');
 const { reserveStock, RESERVATION_TTL_MS } = require('../services/inventory');
+const { getMaintenanceStatus } = require('../services/maintenance');
+const { removeAllDuplicates } = require('../services/stockDedupe');
 const { BRAND, ICON, DIVIDER, brandEmbed, guildFooter } = require('../utils/embeds');
 
 const log = createLogger('cmd:buy');
@@ -37,6 +39,24 @@ module.exports = {
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+    const isAdmin = interaction.member?.permissions?.has?.(PermissionFlagsBits.Administrator);
+    if (!isAdmin) {
+      const maint = await getMaintenanceStatus();
+      if (maint.enabled) {
+        const embed = brandEmbed(interaction.guild, { color: BRAND.warning })
+          .setTitle(`🛠️  SHOP MAINTENANCE`)
+          .setDescription([
+            `Shop sedang **maintenance** saat ini. /buy tidak tersedia sementara.`,
+            '',
+            `**Alasan:** ${maint.reason || '_(tidak disebutkan)_'}`,
+            '',
+            `_Silakan coba lagi nanti._`,
+          ].join('\n'))
+          .setFooter(guildFooter(interaction.guild, 'Maintenance'));
+        return interaction.editReply({ embeds: [embed] });
+      }
+    }
+
     const product = await collections.products().findOne({ name });
     if (!product) {
       const embed = brandEmbed(interaction.guild, { color: BRAND.danger })
@@ -47,6 +67,11 @@ module.exports = {
 
     const totalPrice = product.price * quantity;
     const orderId = new ObjectId();
+
+    const preCheck = await removeAllDuplicates(product._id);
+    if (preCheck.deletedCount > 0) {
+      log.warn(`pre-buy dedupe purged ${preCheck.deletedCount} items for product ${product.name}`);
+    }
 
     const reserveResult = await reserveStock({
       productId: product._id,

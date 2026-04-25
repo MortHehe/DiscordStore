@@ -3,6 +3,7 @@ const { collections } = require('../db');
 const { createLogger } = require('../utils/logger');
 const { formatIDR } = require('../utils/format');
 const { BRAND, ICON, DIVIDER } = require('../utils/embeds');
+const { getMaintenanceStatus } = require('./maintenance');
 
 const log = createLogger('panel');
 const PANEL_ID = 'stockPanel';
@@ -69,13 +70,13 @@ async function aggregateProducts() {
   ]).toArray();
 }
 
-function buildPanelEmbed(products, guild) {
+function buildPanelEmbed(products, guild, maintenance = { enabled: false }) {
   const storeName = guild?.name ?? 'Pixel Shop';
   const updateTs = Math.floor(Date.now() / 1000);
 
   const totalAvailable = products.reduce((s, p) => s + p.available, 0);
   const totalSold = products.reduce((s, p) => s + p.sold, 0);
-  const color =
+  const color = maintenance.enabled ? BRAND.warning :
     products.length === 0 ? BRAND.primary :
     totalAvailable === 0 ? BRAND.danger :
     totalAvailable < products.length * 3 ? BRAND.warning :
@@ -92,8 +93,12 @@ function buildPanelEmbed(products, guild) {
 
   if (guild?.iconURL()) embed.setThumbnail(guild.iconURL({ size: 256 }));
 
+  const welcomeLine = maintenance.enabled
+    ? `🛠️  **SHOP MAINTENANCE** — \`${maintenance.reason || 'sementara tutup'}\`  🛠️`
+    : `${ICON.sparkle} _Selamat datang **Player**! Pilih item favoritmu dan klaim sekarang dengan \`/buy\`._ ${ICON.sparkle}`;
+
   const header = [
-    `${ICON.sparkle} _Selamat datang **Player**! Pilih item favoritmu dan klaim sekarang dengan \`/buy\`._ ${ICON.sparkle}`,
+    welcomeLine,
     '',
     `${ICON.clock}  **Last Update:** <t:${updateTs}:R>   ${ICON.trophy}  **Total Sold:** \`${totalSold}\``,
     DIVIDER,
@@ -142,7 +147,8 @@ function buildPanelEmbed(products, guild) {
 
 async function postPanel(client, channel) {
   const products = await aggregateProducts();
-  const embed = buildPanelEmbed(products, channel.guild);
+  const maintenance = await getMaintenanceStatus();
+  const embed = buildPanelEmbed(products, channel.guild, maintenance);
   const message = await channel.send({ embeds: [embed] });
   await savePanelConfig({
     channelId: channel.id,
@@ -163,7 +169,8 @@ async function updatePanelNow(client = clientRef) {
     if (!channel) return;
     const message = await channel.messages.fetch(config.messageId);
     const products = await aggregateProducts();
-    const embed = buildPanelEmbed(products, channel.guild);
+    const maintenance = await getMaintenanceStatus();
+    const embed = buildPanelEmbed(products, channel.guild, maintenance);
     await message.edit({ embeds: [embed] });
     await savePanelConfig({ channelId: config.channelId, messageId: config.messageId, guildId: config.guildId });
     log.info(`panel updated — ${products.length} product(s) in #${channel.name}`);

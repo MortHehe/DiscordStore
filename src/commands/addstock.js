@@ -4,6 +4,8 @@ const { createLogger } = require('../utils/logger');
 const { getProductNames, filterMatches } = require('../utils/productCache');
 const { schedulePanelUpdate } = require('../services/panel');
 const { BRAND, ICON, brandEmbed, guildFooter } = require('../utils/embeds');
+const { extractDedupeKey } = require('../utils/stockKey');
+const { removeAllDuplicates } = require('../services/stockDedupe');
 
 const log = createLogger('cmd:addstock');
 
@@ -87,8 +89,15 @@ module.exports = {
       }
     }
 
-    const uniqueItems = [...new Set(items)];
-    const duplicates = items.length - uniqueItems.length;
+    const seenKeys = new Set();
+    const uniqueItems = [];
+    let dupInUpload = 0;
+    for (const item of items) {
+      const key = extractDedupeKey(item);
+      if (seenKeys.has(key)) { dupInUpload++; continue; }
+      seenKeys.add(key);
+      uniqueItems.push(item);
+    }
 
     if (uniqueItems.length === 0) {
       return interaction.editReply('Tidak ada item valid ditemukan dalam input.');
@@ -97,34 +106,56 @@ module.exports = {
       return interaction.editReply(`Terlalu banyak item (${uniqueItems.length}). Batas: ${MAX_ITEMS_PER_CALL}.`);
     }
 
+    const existingDocs = await collections.stock()
+      .find(
+        { productId: product._id, sold: false },
+        { projection: { content: 1 } },
+      )
+      .toArray();
+    const existingKeys = new Set(existingDocs.map(d => extractDedupeKey(d.content)));
+    const trulyNew = uniqueItems.filter(c => !existingKeys.has(extractDedupeKey(c)));
+    const dupInDb = uniqueItems.length - trulyNew.length;
+
+    if (trulyNew.length === 0) {
+      return interaction.editReply(
+        `Semua **${uniqueItems.length}** item sudah ada di DB. Tidak ada yang ditambahkan.`,
+      );
+    }
+
     await collections.stock().insertMany(
-      uniqueItems.map(content => ({
+      trulyNew.map(content => ({
         productId: product._id, content, sold: false, createdAt: new Date(),
       })),
     );
 
+    const autoPurge = await removeAllDuplicates(product._id);
+
+    const duplicates = dupInUpload + dupInDb;
+    const added = trulyNew.length - autoPurge.deletedCount;
+    const purged = autoPurge.deletedCount;
+
     const totalStock = await collections.stock().countDocuments({ productId: product._id, sold: false });
 
-    log.info(`admin ${interaction.user.tag} added ${uniqueItems.length} stock to "${product.name}" (source=${source})`);
+    log.info(`admin ${interaction.user.tag} added ${added} stock to "${product.name}" (source=${source}, skipped=${duplicates})`);
     schedulePanelUpdate(interaction.client);
 
     const embed = brandEmbed(interaction.guild, { color: BRAND.success })
       .setTitle(`${ICON.sparkle}  Stock Restocked`)
       .addFields(
         { name: `${ICON.product}  Item`, value: `\`${product.name}\``, inline: true },
-        { name: `${ICON.lightning}  Ditambah`, value: `\`${uniqueItems.length}\``, inline: true },
+        { name: `${ICON.lightning}  Ditambah`, value: `\`${added}\``, inline: true },
         { name: `${ICON.block}  Total Stock`, value: `\`${totalStock}\``, inline: true },
       )
       .setFooter(guildFooter(
         interaction.guild,
-        `Source: ${source}${duplicates > 0 ? ` • ${duplicates} duplikat diabaikan` : ''}`,
+        `Source: ${source}${duplicates > 0 ? ` • ${duplicates} dup skipped` : ''}${purged > 0 ? ` • ${purged} auto-purged` : ''}`,
       ));
 
-    const preview = uniqueItems.slice(0, 3).map(s => s.length > 60 ? s.slice(0, 57) + '...' : s);
+    const preview = trulyNew.slice(0, 3).map(s => s.length > 60 ? s.slice(0, 57) + '...' : s);
     if (preview.length > 0) {
       embed.addFields({
         name: `${ICON.scroll}  Preview`,
-        value: '```\n' + preview.join('\n') + (uniqueItems.length > 3 ? `\n... +${uniqueItems.length - 3} lainnya` : '') + '\n```',
+        value: '```\n' + preview.join('\n') + (added > 3 ? `\n... +${added - 3} lainnya` : '') + '\n```',
         inline: false,
       });
     }
