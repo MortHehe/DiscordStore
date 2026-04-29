@@ -13,6 +13,7 @@ const { BRAND, ICON, DIVIDER, brandEmbed, guildFooter } = require('../utils/embe
 
 const log = createLogger('cmd:buy');
 const MAX_QUANTITY = 50;
+const COOLDOWN_MS = 5 * 60 * 1000;
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -40,6 +41,38 @@ module.exports = {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const isAdmin = interaction.member?.permissions?.has?.(PermissionFlagsBits.Administrator);
+
+    if (!isAdmin) {
+      const recentPending = await collections.orders().findOne(
+        {
+          userId: interaction.user.id,
+          status: 'pending',
+          giftedBy: { $exists: false },
+        },
+        { sort: { createdAt: -1 } },
+      );
+
+      if (recentPending) {
+        const createdAt = new Date(recentPending.createdAt).getTime();
+        const elapsed = Date.now() - createdAt;
+        if (elapsed < COOLDOWN_MS) {
+          const cooldownEndsUnix = Math.floor((createdAt + COOLDOWN_MS) / 1000);
+          const embed = brandEmbed(interaction.guild, { color: BRAND.warning })
+            .setTitle(`${ICON.clock}  Transaksi Sedang Berjalan`)
+            .setDescription(
+              `Kamu masih punya order **pending**. Selesaikan dulu atau tunggu cooldown selesai.`,
+            )
+            .addFields(
+              { name: `${ICON.scroll}  Order Aktif`, value: `\`${recentPending._id}\``, inline: false },
+              { name: `${ICON.target}  Cooldown Berakhir`, value: `<t:${cooldownEndsUnix}:R>`, inline: true },
+              { name: `${ICON.lightning}  Aksi`, value: 'Selesaikan payment, atau tunggu auto-cancel', inline: true },
+            )
+            .setFooter(guildFooter(interaction.guild, 'Cooldown 5 menit per transaksi'));
+          return interaction.editReply({ embeds: [embed] });
+        }
+      }
+    }
+
     if (!isAdmin) {
       const maint = await getMaintenanceStatus();
       if (maint.enabled) {
@@ -63,6 +96,23 @@ module.exports = {
         .setTitle(`${ICON.boom}  Item Tidak Ditemukan`)
         .setDescription(`Item \`${name}\` tidak ada di shop.`);
       return interaction.editReply({ embeds: [embed] });
+    }
+
+    if (product.maxPerOrder && product.maxPerOrder > 0 && !isAdmin) {
+      if (quantity > product.maxPerOrder) {
+        const embed = brandEmbed(interaction.guild, { color: BRAND.warning })
+          .setTitle(`${ICON.fire}  Lewat Limit per Transaksi`)
+          .setDescription(
+            `Item **${product.name}** punya limit **${product.maxPerOrder}** per /buy.\n\n` +
+            `Kamu bisa /buy lagi setelah selesai transaksi ini.`,
+          )
+          .addFields(
+            { name: `${ICON.target}  Max per /buy`, value: `\`${product.maxPerOrder}\``, inline: true },
+            { name: `${ICON.lightning}  Diminta`, value: `\`${quantity}\``, inline: true },
+          )
+          .setFooter(guildFooter(interaction.guild, `Coba dengan max ${product.maxPerOrder}`));
+        return interaction.editReply({ embeds: [embed] });
+      }
     }
 
     const totalPrice = product.price * quantity;
