@@ -68,10 +68,12 @@ async function shutdown(signal) {
     const { stopRefreshJob } = require('./services/panel');
     const { stopPaymentPoller } = require('./services/paymentPoller');
     const { stopWebhookServer } = require('./services/webhookServer');
+    const { stopStatusUpdater } = require('./services/statusPanel');
     stopCleanupJob();
     stopRefreshJob();
     stopPaymentPoller();
     stopWebhookServer();
+    stopStatusUpdater();
     await client.destroy();
     const { closeDatabase } = require('./db');
     await closeDatabase();

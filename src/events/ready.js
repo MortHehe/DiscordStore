@@ -4,6 +4,7 @@ const { updatePanelNow, getPanelConfig, schedulePanelUpdate, startRefreshJob } =
 const { startCleanupJob } = require('../services/inventory');
 const { startPaymentPoller } = require('../services/paymentPoller');
 const { startWebhookServer } = require('../services/webhookServer');
+const { startStatusUpdater, getStatusConfig, updateStatusPanel } = require('../services/statusPanel');
 
 const log = createLogger('ready');
 
@@ -32,5 +33,12 @@ module.exports = {
     startRefreshJob(client);
     startPaymentPoller(client);
     startWebhookServer(client);
+
+    const statusConfig = await getStatusConfig();
+    if (statusConfig) {
+      log.info(`syncing status panel in channel ${statusConfig.channelId}...`);
+      await updateStatusPanel(client);
+    }
+    startStatusUpdater(client);
   },
 };
