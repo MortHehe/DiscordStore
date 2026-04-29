@@ -5,16 +5,14 @@ const VISIBLE_ROWS = 25;
 const UPDATE_INTERVAL_MS = 2500;
 
 class MassLinkTracker {
-  constructor(thread) {
-    this.thread = thread;
-    this.message = null;
+  constructor(editFn) {
+    this.editFn = editFn;
     this.totalRows = 0;
     this.currentStepName = '';
     this.notes = [];
     this.rowStatus = new Map();
     this.lastUpdate = 0;
     this.pendingUpdate = null;
-    this.buffer = '';
     this.fullLog = '';
   }
 
@@ -24,9 +22,8 @@ class MassLinkTracker {
 
   note(line) {
     const ts = new Date().toISOString().split('T')[1].slice(0, 8);
-    const formatted = `[${ts}] ${line}`;
     this.notes.push(line);
-    this.fullLog += formatted + '\n';
+    this.fullLog += `[${ts}] ${line}\n`;
     if (this.notes.length > 5) this.notes = this.notes.slice(-5);
     this.scheduleUpdate();
   }
@@ -36,18 +33,11 @@ class MassLinkTracker {
     this.rowStatus = new Map();
     this.notes = [];
     this.fullLog += `\n=== ${name} (${count} items) ===\n`;
-
     if (this.pendingUpdate) {
       clearTimeout(this.pendingUpdate);
       this.pendingUpdate = null;
     }
-
-    try {
-      this.message = await this.thread.send({ embeds: [this.buildEmbed()] });
-      this.lastUpdate = Date.now();
-    } catch (err) {
-      console.error('startStep send failed:', err.message);
-    }
+    await this.flush();
   }
 
   updateRow(index, status, label) {
@@ -67,12 +57,11 @@ class MassLinkTracker {
   }
 
   async flush() {
-    if (!this.message) return;
     this.lastUpdate = Date.now();
     try {
-      await this.message.edit({ embeds: [this.buildEmbed()] });
+      await this.editFn({ embeds: [this.buildEmbed()] });
     } catch {
-      /* probably rate-limited or msg deleted */
+      /* rate limit / interaction expired */
     }
   }
 
@@ -99,19 +88,12 @@ class MassLinkTracker {
       ? `**Notes:**\n${this.notes.map((n) => `> ${n}`).join('\n')}\n\n`
       : '';
 
-    const embed = new EmbedBuilder()
+    return new EmbedBuilder()
       .setColor(color)
-      .setTitle(`${ICON.lightning}  ${this.currentStepName}`)
-      .setDescription(
-        header +
-        '\n' +
-        notesBlock +
-        (rowsList || '_(menunggu hasil pertama...)_'),
-      )
+      .setTitle(`${ICON.lightning}  ${this.currentStepName || 'MassLink'}`)
+      .setDescription(header + '\n' + notesBlock + (rowsList || '_(menunggu hasil pertama...)_'))
       .setFooter({ text: `Auto-update tiap 2.5s • ${this.totalRows} total rows` })
       .setTimestamp();
-
-    return embed;
   }
 
   async finalize(summaryEmbed) {
@@ -119,11 +101,11 @@ class MassLinkTracker {
       clearTimeout(this.pendingUpdate);
       this.pendingUpdate = null;
     }
-    await this.flush();
-    if (summaryEmbed && this.thread) {
-      try {
-        await this.thread.send({ embeds: [summaryEmbed] });
-      } catch { /* ignore */ }
+    if (summaryEmbed) {
+      try { await this.editFn({ embeds: [summaryEmbed] }); }
+      catch { /* ignore */ }
+    } else {
+      await this.flush();
     }
   }
 

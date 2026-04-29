@@ -129,34 +129,10 @@ module.exports = {
       return interaction.editReply(`${ICON.boom} Failed to download attachment: ${e.message}`);
     }
 
-    let thread;
-    try {
-      thread = await interaction.channel.threads.create({
-        name: `MassLink ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
-        autoArchiveDuration: 60,
-        type: ChannelType.PublicThread,
-        reason: `MassLink triggered by ${interaction.user.tag}`,
-      });
-      await thread.members.add(interaction.user.id).catch(() => {});
-    } catch (err) {
-      botLog.error('thread create failed:', err);
-      return interaction.editReply(`${ICON.boom} Gagal create thread: ${err.message}`);
-    }
-
-    const startEmbed = brandEmbed(interaction.guild, { color: BRAND.pixel })
-      .setTitle(`${ICON.lightning}  MassLink Started`)
-      .setDescription(
-        `Pipeline berjalan di ${thread}.\n\n` +
-        `${ICON.player} Triggered by: <@${interaction.user.id}>\n` +
-        `${ICON.scroll} File: \`${attachment.name}\` (${(attachment.size / 1024).toFixed(1)} KB)\n` +
-        `${ICON.target} Mode: ${onlyCheckSteam ? '`check_only`' : '`full pipeline`'}`,
-      )
-      .setFooter(guildFooter(interaction.guild, 'Lihat thread untuk progress live'))
-      .setTimestamp();
-    await interaction.editReply({ embeds: [startEmbed] });
-
-    const tracker = new MassLinkTracker(thread);
-    botLog.info(`admin ${interaction.user.tag} started masslink (size=${attachment.size}, check_only=${onlyCheckSteam}) in thread ${thread.id}`);
+    const tracker = new MassLinkTracker(async (payload) => {
+      await interaction.editReply(payload);
+    });
+    botLog.info(`admin ${interaction.user.tag} started masslink (size=${attachment.size}, check_only=${onlyCheckSteam}) in channel ${interaction.channel.id}`);
 
     const startedAt = Date.now();
     let summaryEmbed = null;
@@ -223,18 +199,13 @@ module.exports = {
     await tracker.finalize(summaryEmbed);
     const dmResult = await sendResultDm(interaction.user, summaryEmbed, dmFiles);
 
-    try {
-      const finalReply = brandEmbed(interaction.guild, { color: summaryEmbed?.data?.color ?? BRAND.pixel })
-        .setTitle(`${ICON.trophy}  MassLink Selesai`)
-        .setDescription(
-          `Lihat detail di ${thread}.\n\n` +
-          (dmResult.sent
-            ? `📩 _Full report dikirim ke DM kamu._`
-            : `⚠️ _Tidak bisa kirim DM (DM tertutup). Buka DM lalu retry untuk dapat full log._`),
-        )
-        .setFooter(guildFooter(interaction.guild, 'Mass-link pipeline'))
-        .setTimestamp();
-      await interaction.editReply({ embeds: [finalReply] });
-    } catch { /* ignore */ }
+    if (!dmResult.sent) {
+      try {
+        await interaction.followUp({
+          content: `⚠️ Tidak bisa kirim DM ke <@${interaction.user.id}> (DM tertutup). Buka DM dulu untuk dapat full report.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      } catch { /* ignore */ }
+    }
   },
 };
