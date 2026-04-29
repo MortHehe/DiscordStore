@@ -1,6 +1,7 @@
 const {
   SlashCommandBuilder, MessageFlags, PermissionFlagsBits, AttachmentBuilder, ChannelType,
 } = require('discord.js');
+const { collections } = require('../db');
 const { runMassLinkPipeline } = require('../services/massLink');
 const { MassLinkTracker } = require('../services/massLinkTracker');
 const { createLogger } = require('../utils/logger');
@@ -85,6 +86,17 @@ module.exports = {
       botLog.warn(`unauthorized masslink attempt by ${interaction.user.tag} (${interaction.user.id})`);
       return interaction.reply({
         content: `${ICON.shield} Kamu tidak punya akses untuk command ini. Hubungi admin.`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    const ticket = await collections.tickets().findOne({
+      channelId: interaction.channel.id,
+      status: 'open',
+    });
+    if (!ticket) {
+      return interaction.reply({
+        content: `${ICON.shield} \`/masslink\` cuma bisa dijalankan di **dalam ticket channel** yang aktif.\n\nBuka ticket dulu via panel \`/ticketpanel\`, lalu jalankan command di sana.`,
         flags: MessageFlags.Ephemeral,
       });
     }
