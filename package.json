@@ -14,7 +14,10 @@
     "mongodb": "^6.10.0",
     "dotenv": "^16.4.5",
     "imapflow": "^1.0.164",
-    "mailparser": "^3.7.1"
+    "mailparser": "^3.7.1",
+    "steam-user": "^5.2.0",
+    "https-proxy-agent": "^7.0.6",
+    "socks-proxy-agent": "^8.0.5"
   },
   "engines": {
     "node": ">=18"
