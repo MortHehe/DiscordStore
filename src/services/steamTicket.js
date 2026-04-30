@@ -9,10 +9,7 @@ const LICENSE_RETRY_ATTEMPTS = Number(process.env.STEAM_LICENSE_RETRIES) || 3;
 const LICENSE_RETRY_DELAY_MS = Number(process.env.STEAM_LICENSE_DELAY_MS) || 2500;
 const POST_LICENSE_WAIT_MS = Number(process.env.STEAM_POST_LICENSE_WAIT_MS) || 3000;
 const SKIP_FREE_LICENSE = (process.env.STEAM_SKIP_FREE_LICENSE || 'false').toLowerCase() === 'true';
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
+const POST_LOGIN_WAIT_MS = Number(process.env.STEAM_POST_LOGIN_WAIT_MS) || 1500;
 
 function fetchSteamTicket(username, password, proxy) {
   return new Promise((resolve, reject) => {
@@ -21,6 +18,9 @@ function fetchSteamTicket(username, password, proxy) {
 
     const client = new SteamUser(opts);
     let done = false;
+    let loggedOnReady = false;
+    let licensesReady = false;
+    let proceeded = false;
 
     const finish = (err, val) => {
       if (done) return;
@@ -36,6 +36,25 @@ function fetchSteamTicket(username, password, proxy) {
     client.on('steamGuard', (_d, cb) => {
       try { cb(''); } catch { /* ignore */ }
       finish(new Error('Steam Guard required (must be disabled)'));
+    });
+
+    const proceed = () => {
+      if (proceeded) return;
+      if (!loggedOnReady) return;
+      proceeded = true;
+      try { client.gamesPlayed([APP_ID]); } catch { /* ignore */ }
+      setTimeout(() => requestTicket(true), POST_LOGIN_WAIT_MS);
+    };
+
+    client.on('loggedOn', () => {
+      loggedOnReady = true;
+      log.debug(`[${username}] loggedOn`);
+      setTimeout(proceed, 500);
+    });
+
+    client.on('licenses', (licenses) => {
+      licensesReady = true;
+      log.debug(`[${username}] received ${licenses?.length || 0} licenses`);
     });
 
     const tryClaimFreeLicense = (attempt = 1) => {
@@ -55,7 +74,7 @@ function fetchSteamTicket(username, password, proxy) {
           return finish(new Error(
             `free license not granted after ${LICENSE_RETRY_ATTEMPTS} attempts. ` +
             `Possible: limited/region-restricted account, or app needs manual claim. ` +
-            `Set STEAM_SKIP_FREE_LICENSE=true if accounts already own PixelWorlds.`,
+            `Set STEAM_SKIP_FREE_LICENSE=true if accounts already own the game.`,
           ));
         }
         log.info(`[${username}] free license granted for ${APP_ID}`);
@@ -67,7 +86,9 @@ function fetchSteamTicket(username, password, proxy) {
       client.createAuthSessionTicket(APP_ID, (err, result) => {
         if (err) {
           const msg = err.message || String(err);
+          log.debug(`[${username}] createAuthSessionTicket err: ${msg}`);
           if (allowLicenseClaim && /AccessDenied/i.test(msg) && !SKIP_FREE_LICENSE) {
+            log.info(`[${username}] AccessDenied → trying free license claim`);
             return tryClaimFreeLicense();
           }
           return finish(new Error(`createAuthSessionTicket: ${msg}`));
@@ -82,11 +103,6 @@ function fetchSteamTicket(username, password, proxy) {
         });
       });
     };
-
-    client.on('loggedOn', () => {
-      try { client.gamesPlayed([]); } catch { /* ignore */ }
-      requestTicket(true);
-    });
 
     try {
       client.logOn({
