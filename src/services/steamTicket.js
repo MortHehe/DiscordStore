@@ -40,7 +40,7 @@ function fetchSteamTicket(username, password, proxy) {
 
     const proceed = () => {
       if (proceeded) return;
-      if (!loggedOnReady) return;
+      if (!loggedOnReady || !licensesReady) return;
       proceeded = true;
       try { client.gamesPlayed([APP_ID]); } catch { /* ignore */ }
       setTimeout(() => requestTicket(true), POST_LOGIN_WAIT_MS);
@@ -49,13 +49,22 @@ function fetchSteamTicket(username, password, proxy) {
     client.on('loggedOn', () => {
       loggedOnReady = true;
       log.debug(`[${username}] loggedOn`);
-      setTimeout(proceed, 500);
+      proceed();
     });
 
     client.on('licenses', (licenses) => {
       licensesReady = true;
       log.debug(`[${username}] received ${licenses?.length || 0} licenses`);
+      proceed();
     });
+
+    setTimeout(() => {
+      if (loggedOnReady && !licensesReady) {
+        log.warn(`[${username}] licenses event never fired after 8s — proceeding anyway`);
+        licensesReady = true;
+        proceed();
+      }
+    }, 8000);
 
     const tryClaimFreeLicense = (attempt = 1) => {
       client.requestFreeLicense([APP_ID], (lErr, packages, apps) => {
