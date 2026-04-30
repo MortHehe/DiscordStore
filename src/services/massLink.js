@@ -61,9 +61,13 @@ async function stepSteamCheck(rows, tracker) {
     const ticket = await fetchSteamTicket(row.steam_user, row.steam_pass, proxy);
     const json = await loginWithSteam(ticket.ticket, false, proxy);
     if (json.code === 200) return { state: 'linked', playfabId: json.data?.PlayFabId };
-    const errMsg = (json.errorMessage || json.error || '').toString();
-    if (/AccountNotFound|LinkedAccountNotFound/i.test(errMsg)) return { state: 'free' };
-    throw new Error(`unexpected: code=${json.code} ${errMsg.slice(0, 150)}`);
+    const errName = (json.error || '').toString();
+    const errMsg = (json.errorMessage || '').toString();
+    const combined = `${errName} ${errMsg}`;
+    if (/AccountNotFound|LinkedAccountNotFound|UserNotFound|User\s*not\s*found/i.test(combined)) {
+      return { state: 'free' };
+    }
+    throw new Error(`unexpected: code=${json.code} ${(errMsg || errName).slice(0, 150)}`);
   }, (i, result) => {
     if (!result.ok) {
       tracker.updateRow(i, 'failed', `error: ${truncErr(result.err)}`);
@@ -178,15 +182,25 @@ async function runMassLinkPipeline(text, opts, tracker) {
   tracker.note(`Loaded ${rows.length} rows. concurrency=${CONCURRENCY}`);
 
   const check = await stepSteamCheck(rows, tracker);
+  const freeAccounts = check.free.map((f) => f.row);
+
   if (check.linked.length || check.failed.length) {
-    return { aborted: true, reason: `Step 1 — ${check.linked.length} linked, ${check.failed.length} errored`, check };
+    tracker.note(`Step 1 — ${check.linked.length} already linked, ${check.failed.length} errored — skipped. Lanjut ${freeAccounts.length} free.`);
+  }
+
+  if (freeAccounts.length === 0) {
+    return {
+      aborted: true,
+      reason: 'Step 1 — tidak ada akun free yang bisa dilanjut',
+      check,
+    };
   }
 
   if (opts.onlyCheckSteam) {
-    return { steamCheckOnly: true, totalRows: rows.length };
+    return { steamCheckOnly: true, totalRows: rows.length, freeCount: freeAccounts.length };
   }
 
-  const unlink = await stepMassUnlink(rows, tracker);
+  const unlink = await stepMassUnlink(freeAccounts, tracker);
   const accountsToLink = unlink.succeeded;
 
   if (unlink.failed.length) {
@@ -199,20 +213,30 @@ async function runMassLinkPipeline(text, opts, tracker) {
       link: { linked: [], failed: [] },
       unlink,
       totalRows: rows.length,
-      skipped: unlink.failed.map((row) => ({ row, err: unlink.errors.get(row.pw_email) || 'unlink failed' })),
+      check,
+      skipped: [
+        ...check.linked.map(({ row }) => ({ row, err: 'already linked', stage: 'check' })),
+        ...check.failed.map(({ row, err }) => ({ row, err, stage: 'check' })),
+        ...unlink.failed.map((row) => ({ row, err: unlink.errors.get(row.pw_email) || 'unlink failed', stage: 'unlink' })),
+      ],
     };
   }
 
   const indexMap = accountsToLink.map((row) => rows.findIndex((r) => r.pw_email === row.pw_email));
   const link = await stepMassLink(accountsToLink, indexMap, tracker);
 
-  log.info(`pipeline done: ${link.linked.length}/${rows.length} linked, unlinkStuck=${unlink.failed.length}, linkFailed=${link.failed.length}`);
+  log.info(`pipeline done: ${link.linked.length}/${rows.length} linked, checkSkipped=${check.linked.length + check.failed.length}, unlinkStuck=${unlink.failed.length}, linkFailed=${link.failed.length}`);
   return {
     success: true,
     link,
     unlink,
+    check,
     totalRows: rows.length,
-    skipped: unlink.failed.map((row) => ({ row, err: unlink.errors.get(row.pw_email) || 'unlink failed' })),
+    skipped: [
+      ...check.linked.map(({ row }) => ({ row, err: 'already linked', stage: 'check' })),
+      ...check.failed.map(({ row, err }) => ({ row, err, stage: 'check' })),
+      ...unlink.failed.map((row) => ({ row, err: unlink.errors.get(row.pw_email) || 'unlink failed', stage: 'unlink' })),
+    ],
   };
 }
 
