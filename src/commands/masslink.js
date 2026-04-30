@@ -172,7 +172,7 @@ module.exports = {
         } else {
           const failedTxt = allFailed
             .map((f) =>
-              `${f.row.nickname}|${f.row.pw_email}|${f.row.pw_pass}|${f.row.steam_user}|${f.row.steam_pass}  # [${f.stage}] ${f.err}`,
+              `${f.row.nickname}|${f.row.pw_email}|${f.row.pw_pass}|${f.row.steam_user}|${f.row.steam_pass} : ${f.err}`,
             )
             .join('\n');
           const failedAttach = new AttachmentBuilder(Buffer.from(failedTxt, 'utf8'), { name: 'masslink-failed.txt' });
