@@ -42,7 +42,11 @@ class MassLinkTracker {
 
   updateRow(index, status, label) {
     this.rowStatus.set(index, { status, label, time: Date.now() });
-    this.fullLog += `[${index}] ${status === 'success' ? '✓' : status === 'retry' ? '↻' : '✗'} ${label}\n`;
+    const icon = status === 'success' ? '✓'
+               : status === 'retry'   ? '↻'
+               : status === 'skipped' ? '⊘'
+               : '✗';
+    this.fullLog += `[${index}] ${icon} ${label}\n`;
     this.scheduleUpdate();
   }
 
@@ -69,8 +73,9 @@ class MassLinkTracker {
     const all = [...this.rowStatus.entries()];
     const success = all.filter(([, v]) => v.status === 'success').length;
     const failed = all.filter(([, v]) => v.status === 'failed').length;
+    const skipped = all.filter(([, v]) => v.status === 'skipped').length;
     const retrying = all.filter(([, v]) => v.status === 'retry').length;
-    const done = success + failed;
+    const done = success + failed + skipped;
 
     const color = failed > 0 ? BRAND.warning : retrying > 0 ? BRAND.info : BRAND.success;
 
@@ -78,12 +83,15 @@ class MassLinkTracker {
     const rowsList = sortedByTime
       .sort((a, b) => a[0] - b[0])
       .map(([idx, v]) => {
-        const icon = v.status === 'success' ? '✅' : v.status === 'retry' ? '🔁' : '❌';
+        const icon = v.status === 'success' ? '✅'
+                   : v.status === 'retry'   ? '🔁'
+                   : v.status === 'skipped' ? '🛡️'
+                   : '❌';
         return `\`[${String(idx).padStart(3, ' ')}]\` ${icon} ${v.label}`;
       })
       .join('\n');
 
-    const header = `\`\`\`\nprocess: ${done}/${this.totalRows}  |  success: ${success}  |  failed: ${failed}${retrying ? `  |  retry: ${retrying}` : ''}\n\`\`\``;
+    const header = `\`\`\`\nprocess: ${done}/${this.totalRows}  |  success: ${success}  |  failed: ${failed}${skipped ? `  |  skipped: ${skipped}` : ''}${retrying ? `  |  retry: ${retrying}` : ''}\n\`\`\``;
     const notesBlock = this.notes.length
       ? `**Notes:**\n${this.notes.map((n) => `> ${n}`).join('\n')}\n\n`
       : '';

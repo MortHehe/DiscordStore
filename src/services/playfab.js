@@ -77,9 +77,15 @@ async function unlinkSteam(sessionTicket, proxy) {
   const j = await playfabPost('/Client/UnlinkSteamAccount', {}, {
     'X-Authorization': sessionTicket,
   }, proxy);
-  if (j.code !== 200) {
-    throw new Error(`UnlinkSteam code=${j.code} ${(j.errorMessage || j.error || '').toString().slice(0, 150)}`);
+  if (j.code === 200) return;
+
+  const errName = (j.error || '').toString();
+  const errMsg = (j.errorMessage || '').toString();
+  const combined = `${errName} ${errMsg}`;
+  if (/AccountNotLinked|LinkedAccountNotFound|No\s*account\s*was\s*linked/i.test(combined)) {
+    return;
   }
+  throw new Error(`UnlinkSteam code=${j.code} ${(errMsg || errName).slice(0, 150)}`);
 }
 
 async function linkSteam(sessionTicket, steamTicketHex, proxy) {

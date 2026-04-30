@@ -148,13 +148,13 @@ module.exports = {
           { name: `${ICON.clock}  Duration`, value: `\`${elapsed}s\``, inline: true },
           { name: `${ICON.player}  Triggered by`, value: `<@${interaction.user.id}>`, inline: true },
         ]);
-        dmFiles = [logAttachment(tracker.getFullLog())];
+        dmFiles = [];
       } else if (result.steamCheckOnly) {
         summaryEmbed = buildResultEmbed(interaction.guild, 'check-ok', [
           { name: `${ICON.product}  Total checked`, value: `\`${result.totalRows}\``, inline: true },
           { name: `${ICON.clock}  Duration`, value: `\`${elapsed}s\``, inline: true },
         ]);
-        dmFiles = [logAttachment(tracker.getFullLog())];
+        dmFiles = [];
       } else {
         const { link, totalRows, skipped = [] } = result;
         const allFailed = [
@@ -162,29 +162,40 @@ module.exports = {
           ...link.failed.map((f) => ({ ...f, stage: 'link' })),
         ];
 
+        const files = [];
+        if (link.linked.length > 0) {
+          const successTxt = link.linked
+            .map((l) =>
+              `${l.row.nickname}|${l.row.pw_email}|${l.row.pw_pass}|${l.row.steam_user}|${l.row.steam_pass}`,
+            )
+            .join('\n');
+          files.push(new AttachmentBuilder(Buffer.from(successTxt, 'utf8'), { name: 'masslink-success.txt' }));
+        }
+        if (allFailed.length > 0) {
+          const failedTxt = allFailed
+            .map((f) =>
+              `${f.row.nickname}|${f.row.pw_email}|${f.row.pw_pass}|${f.row.steam_user}|${f.row.steam_pass} : ${f.err}`,
+            )
+            .join('\n');
+          files.push(new AttachmentBuilder(Buffer.from(failedTxt, 'utf8'), { name: 'masslink-failed.txt' }));
+        }
+
         if (allFailed.length === 0) {
           summaryEmbed = buildResultEmbed(interaction.guild, 'success', [
             { name: `${ICON.target}  Total`, value: `\`${totalRows}\``, inline: true },
             { name: `${ICON.sparkle}  Linked`, value: `\`${link.linked.length}\``, inline: true },
             { name: `${ICON.clock}  Duration`, value: `\`${elapsed}s\``, inline: true },
           ]);
-          dmFiles = [logAttachment(tracker.getFullLog())];
         } else {
-          const failedTxt = allFailed
-            .map((f) =>
-              `${f.row.nickname}|${f.row.pw_email}|${f.row.pw_pass}|${f.row.steam_user}|${f.row.steam_pass} : ${f.err}`,
-            )
-            .join('\n');
-          const failedAttach = new AttachmentBuilder(Buffer.from(failedTxt, 'utf8'), { name: 'masslink-failed.txt' });
           summaryEmbed = buildResultEmbed(interaction.guild, 'partial', [
             { name: `${ICON.target}  Total`, value: `\`${totalRows}\``, inline: true },
             { name: `${ICON.sparkle}  Linked`, value: `\`${link.linked.length}\``, inline: true },
-            { name: `${ICON.shield}  Skipped (unlink stuck)`, value: `\`${skipped.length}\``, inline: true },
-            { name: `${ICON.boom}  Failed (link step)`, value: `\`${link.failed.length}\``, inline: true },
+            { name: `${ICON.shield}  Skipped`, value: `\`${skipped.length}\``, inline: true },
+            { name: `${ICON.boom}  Failed`, value: `\`${link.failed.length}\``, inline: true },
             { name: `${ICON.clock}  Duration`, value: `\`${elapsed}s\``, inline: true },
           ]);
-          dmFiles = [failedAttach, logAttachment(tracker.getFullLog())];
         }
+        dmFiles = files;
       }
     } catch (e) {
       botLog.error('pipeline crashed:', e);
@@ -193,7 +204,7 @@ module.exports = {
         { name: `${ICON.scroll}  Error`, value: `\`${(e.message || String(e)).slice(0, 500)}\``, inline: false },
         { name: `${ICON.clock}  Duration`, value: `\`${elapsed}s\``, inline: true },
       ]);
-      dmFiles = [logAttachment(tracker.getFullLog())];
+      dmFiles = [];
     }
 
     await tracker.finalize(summaryEmbed);

@@ -72,7 +72,7 @@ async function stepSteamCheck(rows, tracker) {
     if (!result.ok) {
       tracker.updateRow(i, 'failed', `error: ${truncErr(result.err)}`);
     } else if (result.value.state === 'linked') {
-      tracker.updateRow(i, 'failed', 'already linked');
+      tracker.updateRow(i, 'skipped', 'already linked → skip');
     } else {
       tracker.updateRow(i, 'success', 'free');
     }
