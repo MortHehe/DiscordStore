@@ -62,7 +62,7 @@ async function stepSteamCheck(rows, tracker) {
     const json = await loginWithSteam(ticket.ticket, false, proxy);
     if (json.code === 200) return { state: 'linked', playfabId: json.data?.PlayFabId };
     const errMsg = (json.errorMessage || json.error || '').toString();
-    if (/AccountNotFound/i.test(errMsg)) return { state: 'free' };
+    if (/AccountNotFound|LinkedAccountNotFound/i.test(errMsg)) return { state: 'free' };
     throw new Error(`unexpected: code=${json.code} ${errMsg.slice(0, 150)}`);
   }, (i, result) => {
     if (!result.ok) {
