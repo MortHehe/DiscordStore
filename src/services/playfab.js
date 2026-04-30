@@ -1,7 +1,7 @@
 const https = require('node:https');
 const { makeAgent } = require('./proxyPool');
 
-const TITLE_ID = process.env.PIXELWORLD_TITLE_ID || '11EF5C';
+const TITLE_ID = process.env.GAME_PLAYFAB_TITLE_ID || process.env.PIXELWORLD_TITLE_ID || '11EF5C';
 const PLAYFAB_BASE = `https://${TITLE_ID.toLowerCase()}.playfabapi.com`;
 
 function commonHeaders() {

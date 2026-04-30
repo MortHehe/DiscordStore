@@ -4,7 +4,7 @@ const { createLogger } = require('../utils/logger');
 
 const log = createLogger('steam-ticket');
 
-const APP_ID = Number(process.env.PIXELWORLD_APP_ID) || 871980;
+const APP_ID = Number(process.env.GAME_STEAM_APP_ID) || Number(process.env.PIXELWORLD_APP_ID) || 636040;
 const LICENSE_RETRY_ATTEMPTS = Number(process.env.STEAM_LICENSE_RETRIES) || 3;
 const LICENSE_RETRY_DELAY_MS = Number(process.env.STEAM_LICENSE_DELAY_MS) || 2500;
 const POST_LICENSE_WAIT_MS = Number(process.env.STEAM_POST_LICENSE_WAIT_MS) || 3000;
@@ -39,26 +39,26 @@ function fetchSteamTicket(username, password, proxy) {
     });
 
     const tryClaimFreeLicense = (attempt = 1) => {
-      client.requestFreeLicense([APP_ID], (lErr, _pkgs, apps) => {
+      client.requestFreeLicense([APP_ID], (lErr, packages, apps) => {
         if (lErr) {
+          log.warn(`[${username}] license claim error: ${lErr.message || lErr}`);
           if (attempt < LICENSE_RETRY_ATTEMPTS) {
-            log.debug(`license claim error (${lErr.message || lErr}), retry ${attempt + 1}/${LICENSE_RETRY_ATTEMPTS}`);
             return setTimeout(() => tryClaimFreeLicense(attempt + 1), LICENSE_RETRY_DELAY_MS);
           }
           return finish(new Error(`requestFreeLicense: ${lErr.message || lErr}`));
         }
+        log.info(`[${username}] requestFreeLicense returned: pkgs=${JSON.stringify(packages)} apps=${JSON.stringify(apps)}`);
         if (!apps?.includes(APP_ID)) {
           if (attempt < LICENSE_RETRY_ATTEMPTS) {
-            log.debug(`license not granted (got apps=${JSON.stringify(apps)}), retry ${attempt + 1}/${LICENSE_RETRY_ATTEMPTS}`);
             return setTimeout(() => tryClaimFreeLicense(attempt + 1), LICENSE_RETRY_DELAY_MS);
           }
           return finish(new Error(
             `free license not granted after ${LICENSE_RETRY_ATTEMPTS} attempts. ` +
-            `Possible: account too new/flagged/region-restricted. ` +
+            `Possible: limited/region-restricted account, or app needs manual claim. ` +
             `Set STEAM_SKIP_FREE_LICENSE=true if accounts already own PixelWorlds.`,
           ));
         }
-        log.debug(`free license granted for ${APP_ID}`);
+        log.info(`[${username}] free license granted for ${APP_ID}`);
         setTimeout(() => requestTicket(false), POST_LICENSE_WAIT_MS);
       });
     };
