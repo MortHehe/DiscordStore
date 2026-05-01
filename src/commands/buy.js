@@ -24,7 +24,7 @@ module.exports = {
     .addIntegerOption(opt =>
       opt.setName('quantity')
          .setDescription(`Jumlah pembelian (default 1, max ${MAX_QUANTITY})`)
-         .setMinValue(1).setMaxValue(MAX_QUANTITY).setRequired(false)),
+         .setMinValue(1).setMaxValue(MAX_QUANTITY).setRequired(true)),
 
   async autocomplete(interaction) {
     await getProductNames();
