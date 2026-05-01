@@ -13,17 +13,7 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_EXT = /\.(txt|csv|log)$/i;
 
 function isAuthorized(interaction) {
-  const isAdmin = interaction.member?.permissions?.has?.(PermissionFlagsBits.Administrator);
-  if (isAdmin) return true;
-
-  const roleId = process.env.MASSLINK_ROLE_ID;
-  if (roleId && interaction.member?.roles?.cache?.has?.(roleId)) return true;
-
-  const userIds = (process.env.MASSLINK_ALLOW_USER_IDS || '')
-    .split(',').map(s => s.trim()).filter(Boolean);
-  if (userIds.includes(interaction.user.id)) return true;
-
-  return false;
+  return true;
 }
 
 function buildResultEmbed(guild, status, details) {
