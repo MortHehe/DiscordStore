@@ -14,7 +14,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('searchemail')
     .setDescription('[Admin] Cari email di inbox admin berdasarkan email penerima (IMAP)')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .setDefaultMemberPermissions(PermissionFlagsBits.all)
     .addStringOption(o =>
       o.setName('to').setDescription('Email penerima (misal: account123@gmail.com)').setRequired(true))
     .addIntegerOption(o =>
